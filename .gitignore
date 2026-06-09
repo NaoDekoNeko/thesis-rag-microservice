@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+*.bkp
+*.bak
+*.orig
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/

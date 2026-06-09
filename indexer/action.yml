@@ -1,0 +1,43 @@
+name: RAG Indexer
+description: Indexa documentos Markdown de un minisite Docusaurus en PostgreSQL+pgvector
+
+inputs:
+  docs-path:
+    description: Ruta local a la carpeta docs/ del minisite
+    required: true
+  doc-folder:
+    description: Nombre identificador del minisite (e.g. thesis-doc-test-1)
+    required: true
+  clear:
+    description: Borrar registros previos de este doc-folder antes de indexar
+    required: false
+    default: 'false'
+  gemini-api-key:
+    required: true
+  db-host:
+    required: true
+  db-port:
+    required: false
+    default: '5432'
+  db-name:
+    required: true
+  db-user:
+    required: true
+  db-password:
+    required: true
+
+runs:
+  using: docker
+  image: Dockerfile
+  env:
+    GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+    DB_HOST: ${{ inputs.db-host }}
+    DB_PORT: ${{ inputs.db-port }}
+    DB_NAME: ${{ inputs.db-name }}
+    DB_USER: ${{ inputs.db-user }}
+    DB_PASSWORD: ${{ inputs.db-password }}
+    DOC_FOLDER: ${{ inputs.doc-folder }}
+  args:
+    - --docs-path
+    - ${{ inputs.docs-path }}
+    - ${{ inputs.clear == 'true' && '--clear' || '' }}
