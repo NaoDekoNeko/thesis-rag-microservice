@@ -70,11 +70,15 @@ export class SearchService {
 
     const vector = `[${embedding.join(',')}]`;
     const { sql: filterSql, params: filterParams } = filters;
+    // $1 is the vector; filter params start at $2, so offset their indices by 1
+    const offsetFilterSql = filterSql
+      ? filterSql.replace(/\$(\d+)/g, (_, n) => `$${parseInt(n) + 1}`)
+      : '';
     const sql = `
       SELECT doc_folder, title, url, category, content,
              1 - (embedding <=> $1::vector) AS score
       FROM ${this.table}
-      ${filterSql ? `WHERE ${filterSql}` : ''}
+      ${offsetFilterSql ? `WHERE ${offsetFilterSql}` : ''}
       ORDER BY embedding <=> $1::vector
       LIMIT $${filterParams.length + 2}
     `;
