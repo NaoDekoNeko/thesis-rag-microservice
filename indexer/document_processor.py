@@ -11,7 +11,6 @@ Variables opcionales:
   VECTOR_TABLE_NAME (default doc_embeddings_rag),
   DOC_FOLDER (default "unknown"), BATCH_SIZE (default 20)
 """
-import argparse
 import os
 import re
 import time
@@ -164,14 +163,11 @@ def index_docs(conn, docs: list[dict], client: genai.Client):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--docs-path", required=True, help="Carpeta docs/ del minisite")
-    parser.add_argument("--clear", action="store_true", help="Borrar registros de este DOC_FOLDER antes de indexar")
-    args = parser.parse_args()
-
-    docs_path = Path(args.docs_path).resolve()
+    docs_path = Path(os.environ.get("DOCS_PATH", "")).resolve()
     if not docs_path.exists():
         raise SystemExit(f"Ruta no existe: {docs_path}")
+
+    clear = os.environ.get("CLEAR", "false").lower() == "true"
 
     print(f"Conectando a {DB_HOST}:{DB_PORT}/{DB_NAME}...")
     conn = psycopg2.connect(
@@ -180,7 +176,7 @@ def main():
     )
     setup_db(conn)
 
-    if args.clear:
+    if clear:
         with conn.cursor() as cur:
             cur.execute(f"DELETE FROM {TABLE} WHERE doc_folder = %s", (DOC_FOLDER,))
         conn.commit()

@@ -37,7 +37,5 @@ runs:
     DB_USER: ${{ inputs.db-user }}
     DB_PASSWORD: ${{ inputs.db-password }}
     DOC_FOLDER: ${{ inputs.doc-folder }}
-  args:
-    - --docs-path
-    - ${{ inputs.docs-path }}
-    - ${{ inputs.clear == 'true' && '--clear' || '' }}
+    DOCS_PATH: ${{ inputs.docs-path }}
+    CLEAR: ${{ inputs.clear }}
