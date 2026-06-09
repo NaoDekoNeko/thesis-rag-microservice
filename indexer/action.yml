@@ -14,7 +14,12 @@ inputs:
     default: 'false'
   gemini-api-key:
     required: true
-  db-host:
+  wif-provider:
+    required: true
+  wif-service-account:
+    required: true
+  db-instance:
+    description: Cloud SQL instance connection name (project:region:instance)
     required: true
   db-port:
     required: false
@@ -27,15 +32,38 @@ inputs:
     required: true
 
 runs:
-  using: docker
-  image: Dockerfile
-  env:
-    GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
-    DB_HOST: ${{ inputs.db-host }}
-    DB_PORT: ${{ inputs.db-port }}
-    DB_NAME: ${{ inputs.db-name }}
-    DB_USER: ${{ inputs.db-user }}
-    DB_PASSWORD: ${{ inputs.db-password }}
-    DOC_FOLDER: ${{ inputs.doc-folder }}
-    DOCS_PATH: ${{ inputs.docs-path }}
-    CLEAR: ${{ inputs.clear }}
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install -r ${{ github.action_path }}/requirements.txt
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.wif-provider }}
+        service_account: ${{ inputs.wif-service-account }}
+
+    - name: Start Cloud SQL Proxy
+      uses: google-github-actions/sql-cloud-proxy@v1
+      with:
+        instances: ${{ inputs.db-instance }}=tcp:${{ inputs.db-port }}
+
+    - name: Index documents
+      shell: bash
+      env:
+        GEMINI_API_KEY: ${{ inputs.gemini-api-key }}
+        DB_HOST: 127.0.0.1
+        DB_PORT: ${{ inputs.db-port }}
+        DB_NAME: ${{ inputs.db-name }}
+        DB_USER: ${{ inputs.db-user }}
+        DB_PASSWORD: ${{ inputs.db-password }}
+        DOC_FOLDER: ${{ inputs.doc-folder }}
+        DOCS_PATH: ${{ inputs.docs-path }}
+        CLEAR: ${{ inputs.clear }}
+      run: python ${{ github.action_path }}/document_processor.py
