@@ -50,9 +50,13 @@ runs:
         service_account: ${{ inputs.wif-service-account }}
 
     - name: Start Cloud SQL Proxy
-      uses: google-github-actions/sql-cloud-proxy@v1
-      with:
-        instances: ${{ inputs.db-instance }}=tcp:${{ inputs.db-port }}
+      shell: bash
+      run: |
+        curl -fsSL "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.15.2/cloud-sql-proxy.linux.amd64" \
+          -o /usr/local/bin/cloud-sql-proxy
+        chmod +x /usr/local/bin/cloud-sql-proxy
+        cloud-sql-proxy --port ${{ inputs.db-port }} "${{ inputs.db-instance }}" &
+        sleep 3
 
     - name: Index documents
       shell: bash
