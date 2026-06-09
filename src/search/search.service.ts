@@ -78,12 +78,17 @@ export class SearchService {
       ORDER BY embedding <=> $1::vector
       LIMIT $${filterParams.length + 2}
     `;
-    const { rows } = await this.db.query<SearchResult>(sql, [
-      vector,
-      ...filterParams,
-      limit,
-    ]);
-    return rows;
+    try {
+      const { rows } = await this.db.query<SearchResult>(sql, [
+        vector,
+        ...filterParams,
+        limit,
+      ]);
+      return rows;
+    } catch (err) {
+      this.logger.warn('Semantic search DB query failed', err?.message);
+      return [];
+    }
   }
 
   private async keywordSearch(
