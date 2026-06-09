@@ -60,6 +60,7 @@ export class SearchService {
       const res = await this.genai.models.embedContent({
         model: this.embeddingModel,
         contents: query,
+        config: { outputDimensionality: 768 },
       });
       embedding = res.embeddings?.[0]?.values ?? [];
     } catch (err) {

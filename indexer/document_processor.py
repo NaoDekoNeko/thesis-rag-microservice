@@ -18,6 +18,7 @@ from pathlib import Path
 
 import psycopg2
 from google import genai
+from google.genai import types
 
 # ── Config ────────────────────────────────────────────────────────────────────
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
@@ -123,6 +124,7 @@ def embed_batch(client: genai.Client, texts: list[str]) -> list[list[float]]:
             res = client.models.embed_content(
                 model=EMBEDDING_MODEL,
                 contents=texts,
+                config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM),
             )
             return [e.values for e in res.embeddings]
         except Exception as e:
