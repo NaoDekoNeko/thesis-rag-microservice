@@ -37,7 +37,7 @@ RESPUESTA DETALLADA:`;
         contents: prompt,
         config: {
           temperature: 0.2,
-          maxOutputTokens: 768,
+          maxOutputTokens: 2048,
           topP: 0.9,
           topK: 20,
         },
