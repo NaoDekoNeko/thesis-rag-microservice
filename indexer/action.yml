@@ -30,6 +30,10 @@ inputs:
     required: true
   db-password:
     required: true
+  microservice-url:
+    description: URL del microservicio RAG (para activar schema antes de indexar)
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -67,6 +71,7 @@ runs:
         DB_NAME: ${{ inputs.db-name }}
         DB_USER: ${{ inputs.db-user }}
         DB_PASSWORD: ${{ inputs.db-password }}
+        MICROSERVICE_URL: ${{ inputs.microservice-url }}
         DOC_FOLDER: ${{ inputs.doc-folder }}
         DOCS_PATH: ${{ inputs.docs-path }}
         CLEAR: ${{ inputs.clear }}

@@ -24,11 +24,24 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     await this.setupSchema();
   }
 
-  private async setupSchema() {
-    try {
-      await this.pool.query('CREATE EXTENSION IF NOT EXISTS vector;');
-    } catch {
-      this.logger.warn('Could not create vector extension — ensure it is already enabled or run indexer first');
+  async setupSchema() {
+    const superuserPassword = this.config.get('DB_SUPERUSER_PASSWORD');
+    if (superuserPassword) {
+      try {
+        const superPool = new Pool({
+          host: this.config.get('DB_HOST'),
+          port: this.config.get<number>('DB_PORT', 5432),
+          database: this.config.get('DB_NAME'),
+          user: 'postgres',
+          password: superuserPassword,
+          max: 1,
+        });
+        await superPool.query('CREATE EXTENSION IF NOT EXISTS vector;');
+        await superPool.end();
+        this.logger.log('pgvector extension ready');
+      } catch {
+        this.logger.warn('Could not create vector extension via superuser — may already exist');
+      }
     }
     try {
       await this.pool.query(`

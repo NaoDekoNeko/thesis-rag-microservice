@@ -27,6 +27,7 @@ DB_PORT = int(os.environ.get("DB_PORT", 5432))
 DB_NAME = os.environ["DB_NAME"]
 DB_USER = os.environ["DB_USER"]
 DB_PASSWORD = os.environ["DB_PASSWORD"]
+MICROSERVICE_URL = os.environ.get("MICROSERVICE_URL", "")
 
 CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", 500))
 CHUNK_OVERLAP = int(CHUNK_SIZE * float(os.environ.get("CHUNK_OVERLAP_PCT", 0.25)))
@@ -38,9 +39,23 @@ EMBEDDING_DIM = 768
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def activate_schema():
+    if not MICROSERVICE_URL:
+        print("MICROSERVICE_URL no configurado — omitiendo setup-db")
+        return
+    import urllib.request
+    url = f"{MICROSERVICE_URL.rstrip('/')}/admin/setup-db"
+    req = urllib.request.Request(url, data=b'', method='POST')
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            print(f"Schema activado: {resp.read().decode()}")
+    except Exception as e:
+        print(f"Advertencia: setup-db endpoint falló: {e}")
+
+
 def setup_db(conn):
     with conn.cursor() as cur:
-        cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+        pass  # schema ya activado via microservicio
         cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {TABLE} (
                 id          SERIAL PRIMARY KEY,
@@ -172,6 +187,7 @@ def main():
     clear = os.environ.get("CLEAR", "false").lower() == "true"
 
     print(f"Conectando a {DB_HOST}:{DB_PORT}/{DB_NAME}...")
+    activate_schema()
     conn = psycopg2.connect(
         host=DB_HOST, port=DB_PORT, dbname=DB_NAME,
         user=DB_USER, password=DB_PASSWORD,
