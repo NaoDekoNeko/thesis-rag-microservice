@@ -141,7 +141,13 @@ def embed_batch(client: genai.Client, texts: list[str]) -> list[list[float]]:
                 contents=texts,
                 config=types.EmbedContentConfig(output_dimensionality=EMBEDDING_DIM),
             )
-            return [e.values for e in res.embeddings]
+            embeddings = [e.values for e in res.embeddings]
+            for emb in embeddings:
+                if len(emb) != EMBEDDING_DIM:
+                    raise ValueError(
+                        f"Embedding dimension mismatch: expected {EMBEDDING_DIM}, got {len(emb)}"
+                    )
+            return embeddings
         except Exception as e:
             if attempt == 2:
                 raise
