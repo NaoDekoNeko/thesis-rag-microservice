@@ -26,7 +26,11 @@ interface SearchHit {
   score: number;
 }
 
-const MODES = ['lexical', 'vector', 'hybrid'] as const;
+// EVAL_MODES permite añadir modos (p. ej. hybrid_full en la implementación
+// local de la Etapa 1) sin tocar el uso por defecto contra el cloud.
+const MODES: string[] = process.env.EVAL_MODES
+  ? process.env.EVAL_MODES.split(',').map((m) => m.trim()).filter(Boolean)
+  : ['lexical', 'vector', 'hybrid'];
 const BASE_URL = process.env.MICROSERVICE_URL;
 if (!BASE_URL) throw new Error('MICROSERVICE_URL no configurado');
 
@@ -69,25 +73,37 @@ function avg(nums: (number | null)[]) {
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
 
-async function search(query: string, mode: string): Promise<SearchHit[]> {
+function p95(nums: number[]) {
+  if (nums.length === 0) return null;
+  const sorted = [...nums].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)];
+}
+
+async function search(
+  query: string,
+  mode: string,
+): Promise<{ hits: SearchHit[]; latencyMs: number }> {
   const url = `${BASE_URL}/search?q=${encodeURIComponent(query)}&mode=${mode}&k=10`;
+  const start = performance.now();
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url} -> ${res.status}`);
   const body = await res.json();
-  return body.results;
+  return { hits: body.results, latencyMs: performance.now() - start };
 }
 
 async function main() {
   const gt = JSON.parse(readFileSync(join(__dirname, 'ground-truth.json'), 'utf-8'));
   const queries: Query[] = gt.queries;
 
-  const perModeRows: Record<string, any[]> = { lexical: [], vector: [], hybrid: [] };
-  const abstention: Record<string, number[]> = { lexical: [], vector: [], hybrid: [] };
+  const perModeRows: Record<string, any[]> = Object.fromEntries(MODES.map((m) => [m, []]));
+  const abstention: Record<string, number[]> = Object.fromEntries(MODES.map((m) => [m, []]));
+  const latencies: Record<string, number[]> = Object.fromEntries(MODES.map((m) => [m, []]));
 
   for (const q of queries) {
     const relevant = new Map(q.relevant_documents.map((d) => [key(d), d.relevance_grade]));
     for (const mode of MODES) {
-      const hits = await search(q.query_text, mode);
+      const { hits, latencyMs } = await search(q.query_text, mode);
+      latencies[mode].push(latencyMs);
       if (q.query_type === 'sin_evidencia') {
         abstention[mode].push(hits[0]?.score ?? 0);
         continue;
@@ -116,6 +132,8 @@ async function main() {
       mrr: avg(rows.map((r) => r.mrr)),
       ndcg10: avg(rows.map((r) => r.ndcg10)),
       avgTopScoreOnNoEvidenceQueries: avg(abstention[mode]),
+      latencyAvgMs: avg(latencies[mode]),
+      latencyP95Ms: p95(latencies[mode]),
     };
     report.byModeAndType[mode] = {};
     for (const type of [...new Set(rows.map((r) => r.query_type))]) {
