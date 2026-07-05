@@ -126,27 +126,39 @@ export class SearchService {
     }
   }
 
+  // Misma semántica léxica que la implementación local (Etapa 1): OR entre
+  // palabras con to_tsquery y ts_rank_cd normalizado a [0,1) con el flag 32,
+  // de modo que el score léxico sea comparable con la similitud coseno en la
+  // fusión híbrida. plainto_tsquery (AND) dejaba al componente léxico sin
+  // candidatos ante preguntas conversacionales.
   private async keywordSearch(
     query: string,
     limit: number,
     filters: { sql: string; params: any[] },
   ): Promise<SearchResult[]> {
+    const words = query
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 2);
+    if (words.length === 0) return [];
+    const tsquery = words.join(' | ');
+
     const { sql: filterSql, params: filterParams } = filters;
     const queryParam = filterParams.length + 1;
     const limitParam = filterParams.length + 2;
     const sql = `
       SELECT doc_folder, title, url, category, content,
-             ts_rank_cd(fts_vector, plainto_tsquery('spanish', $${queryParam})) AS score
+             ts_rank_cd(fts_vector, to_tsquery('spanish', $${queryParam}), 32) AS score
       FROM ${this.table}
       ${filterSql ? `WHERE ${filterSql} AND` : 'WHERE'}
-        fts_vector @@ plainto_tsquery('spanish', $${queryParam})
+        fts_vector @@ to_tsquery('spanish', $${queryParam})
       ORDER BY score DESC
       LIMIT $${limitParam}
     `;
     try {
       const { rows } = await this.db.query<SearchResult>(sql, [
         ...filterParams,
-        query,
+        tsquery,
         limit,
       ]);
       return rows;
