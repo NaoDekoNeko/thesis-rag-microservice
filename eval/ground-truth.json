@@ -1,0 +1,325 @@
+{
+  "description": "Conjunto anotado de consultas para evaluar la recuperación híbrida contra baselines léxico puro y vectorial puro sobre el corpus neutral de la Etapa 2 (thesis-doc-test-1 + thesis-doc-test-2).",
+  "schema": {
+    "query_id": "identificador único",
+    "query_text": "consulta en lenguaje natural",
+    "query_type": "focalizada | dominio | cross_site | ambigua | sin_evidencia",
+    "expected_domain": "categoría o dominio esperado",
+    "relevant_documents": "lista de {doc_folder, url, relevance_grade} con relevance_grade en {0,1,2}",
+    "notes": "criterio de relevancia o justificación de la anotación"
+  },
+  "queries": [
+    {
+      "query_id": "F1",
+      "query_text": "¿Qué patrón de build reduce el tamaño final de una imagen usando una imagen pesada para compilar y una mínima para ejecutar?",
+      "query_type": "focalizada",
+      "expected_domain": "containers",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/multi-stage-builds", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/docker-fundamentals", "relevance_grade": 1 }
+      ],
+      "notes": "Respuesta directa en multi-stage-builds; docker-fundamentals da contexto de imagen/capa."
+    },
+    {
+      "query_id": "F2",
+      "query_text": "¿Qué comando de Terraform muestra los cambios antes de aplicarlos sin modificar la infraestructura?",
+      "query_type": "focalizada",
+      "expected_domain": "iac",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/iac/terraform-basics", "relevance_grade": 2 }
+      ],
+      "notes": "terraform plan documentado explícitamente en terraform-basics."
+    },
+    {
+      "query_id": "F3",
+      "query_text": "¿Cómo emite logs el microservicio para que sean compatibles con Cloud Logging?",
+      "query_type": "focalizada",
+      "expected_domain": "observability",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/observability/logging", "relevance_grade": 2 }
+      ],
+      "notes": "Logger de NestJS emitiendo JSON documentado en logging.mdx."
+    },
+    {
+      "query_id": "F4",
+      "query_text": "¿Qué principio establece que una clase debe tener una sola razón para cambiar?",
+      "query_type": "focalizada",
+      "expected_domain": "patterns",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/patterns/solid", "relevance_grade": 2 }
+      ],
+      "notes": "Single Responsibility Principle definido en solid.mdx."
+    },
+    {
+      "query_id": "F5",
+      "query_text": "¿Qué estrategias de versionamiento de APIs existen y cuáles son sus ventajas y desventajas?",
+      "query_type": "focalizada",
+      "expected_domain": "apis",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/apis/versioning", "relevance_grade": 2 }
+      ],
+      "notes": "URI versioning con ventajas/desventajas documentado en versioning.mdx."
+    },
+    {
+      "query_id": "F6",
+      "query_text": "¿Qué alternativas de motor de búsqueda se evaluaron para el stack RAG del proyecto?",
+      "query_type": "focalizada",
+      "expected_domain": "adrs",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/adrs/adr-001-rag-stack", "relevance_grade": 2 }
+      ],
+      "notes": "Tabla de alternativas evaluadas (Elasticsearch, etc.) en adr-001-rag-stack.mdx."
+    },
+    {
+      "query_id": "D1",
+      "query_text": "¿Qué cubre la documentación de CI/CD de este portal?",
+      "query_type": "dominio",
+      "expected_domain": "cicd",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/cicd/github-actions", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/cicd/pipelines", "relevance_grade": 2 }
+      ],
+      "notes": "Consulta de dominio completo; ambos documentos de la categoría cicd son relevantes."
+    },
+    {
+      "query_id": "D2",
+      "query_text": "¿Qué temas abarca la sección de contenedores de la documentación?",
+      "query_type": "dominio",
+      "expected_domain": "containers",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/docker-fundamentals", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/multi-stage-builds", "relevance_grade": 2 }
+      ],
+      "notes": "Ambos documentos de containers son relevantes al dominio."
+    },
+    {
+      "query_id": "D3",
+      "query_text": "¿Qué recursos de infraestructura como código se documentan en el proyecto?",
+      "query_type": "dominio",
+      "expected_domain": "iac",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/iac/terraform-basics", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/iac/gcp-resources", "relevance_grade": 2 }
+      ],
+      "notes": "Ambos documentos de iac son relevantes al dominio."
+    },
+    {
+      "query_id": "D4",
+      "query_text": "¿Qué se documenta sobre observabilidad del sistema?",
+      "query_type": "dominio",
+      "expected_domain": "observability",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/observability/logging", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/observability/monitoring", "relevance_grade": 2 }
+      ],
+      "notes": "Ambos documentos de observability son relevantes al dominio."
+    },
+    {
+      "query_id": "D5",
+      "query_text": "¿Qué patrones de diseño se documentan en el portal de arquitectura de software?",
+      "query_type": "dominio",
+      "expected_domain": "patterns",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/patterns/design-patterns", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/patterns/solid", "relevance_grade": 2 }
+      ],
+      "notes": "Ambos documentos de patterns son relevantes al dominio."
+    },
+    {
+      "query_id": "D6",
+      "query_text": "¿Qué aspectos del diseño de APIs REST se documentan?",
+      "query_type": "dominio",
+      "expected_domain": "apis",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/apis/rest-design", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/apis/versioning", "relevance_grade": 2 }
+      ],
+      "notes": "Ambos documentos de apis son relevantes al dominio."
+    },
+    {
+      "query_id": "C1",
+      "query_text": "¿Qué recursos de Cloud Run se provisionan para el microservicio y cómo encaja eso con la arquitectura de microservicios documentada?",
+      "query_type": "cross_site",
+      "expected_domain": "cross_site",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/iac/gcp-resources", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/microservices/intro", "relevance_grade": 2 }
+      ],
+      "notes": "Requiere combinar el mapa de recursos GCP (doc-test-1) con los fundamentos de microservicios (doc-test-2)."
+    },
+    {
+      "query_id": "C2",
+      "query_text": "¿Qué ejemplos de clases del microservicio de búsqueda aparecen tanto en la documentación de patrones de diseño como en la de observabilidad?",
+      "query_type": "cross_site",
+      "expected_domain": "cross_site",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/patterns/solid", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/observability/logging", "relevance_grade": 2 }
+      ],
+      "notes": "SearchService/Logger aparecen como ejemplo de código en ambos documentos, de repos distintos."
+    },
+    {
+      "query_id": "C3",
+      "query_text": "¿Qué pipeline de CI/CD despliega el microservicio cuyo stack tecnológico se documenta como decisión arquitectónica?",
+      "query_type": "cross_site",
+      "expected_domain": "cross_site",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/cicd/pipelines", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/cicd/github-actions", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/adrs/adr-001-rag-stack", "relevance_grade": 2 }
+      ],
+      "notes": "Une el diseño de pipelines (doc-test-1) con el ADR del stack RAG que ese pipeline despliega (doc-test-2)."
+    },
+    {
+      "query_id": "C4",
+      "query_text": "¿Cómo se relaciona el empaquetado en contenedores del microservicio con el principio de despliegue independiente de una arquitectura de microservicios?",
+      "query_type": "cross_site",
+      "expected_domain": "cross_site",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/multi-stage-builds", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/docker-fundamentals", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/microservices/intro", "relevance_grade": 2 }
+      ],
+      "notes": "'Desplegable de forma independiente' se define en microservices/intro; el empaquetado que lo habilita está en containers."
+    },
+    {
+      "query_id": "C5",
+      "query_text": "¿Qué métricas de Cloud Run permiten observar la latencia de las solicitudes al endpoint que responde preguntas del microservicio?",
+      "query_type": "cross_site",
+      "expected_domain": "cross_site",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/observability/monitoring", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/apis/rest-design", "relevance_grade": 1 }
+      ],
+      "notes": "request_latencies está en monitoring; el endpoint POST /chat/ask referenciado está documentado como ejemplo en rest-design."
+    },
+    {
+      "query_id": "C6",
+      "query_text": "¿Qué base de datos provisionada con Terraform respalda el principio de que cada microservicio es dueño de sus propios datos?",
+      "query_type": "cross_site",
+      "expected_domain": "cross_site",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/iac/gcp-resources", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/microservices/intro", "relevance_grade": 2 }
+      ],
+      "notes": "Cloud SQL + pgvector está en gcp-resources; 'dueño de sus datos' se define en microservices/intro."
+    },
+    {
+      "query_id": "A1",
+      "query_text": "¿Qué es un pipeline en este proyecto?",
+      "query_type": "ambigua",
+      "expected_domain": "ambigua",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/cicd/pipelines", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/cicd/github-actions", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/microservices/communication", "relevance_grade": 0 }
+      ],
+      "notes": "'Pipeline' es el término propio de cicd; communication.mdx muestra un flujo de solicitud, no un pipeline, por lo que es un distractor (grade 0)."
+    },
+    {
+      "query_id": "A2",
+      "query_text": "¿Qué es un recurso en el contexto de este proyecto?",
+      "query_type": "ambigua",
+      "expected_domain": "ambigua",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/apis/rest-design", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/iac/gcp-resources", "relevance_grade": 1 }
+      ],
+      "notes": "'Recurso' significa entidad de una URL REST en apis, y componente de infraestructura GCP en iac; ambas lecturas son válidas."
+    },
+    {
+      "query_id": "A3",
+      "query_text": "¿Qué implica el proceso de build en este proyecto?",
+      "query_type": "ambigua",
+      "expected_domain": "ambigua",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/docker-fundamentals", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/multi-stage-builds", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/cicd/pipelines", "relevance_grade": 1 }
+      ],
+      "notes": "'Build' se usa tanto para construir la imagen Docker como para el paso 'pnpm build' del pipeline de publicación."
+    },
+    {
+      "query_id": "A4",
+      "query_text": "¿Cómo se versiona algo en este proyecto?",
+      "query_type": "ambigua",
+      "expected_domain": "ambigua",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/apis/versioning", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/iac/terraform-basics", "relevance_grade": 1 }
+      ],
+      "notes": "'Versionar' aplica tanto al contrato de la API (versioning.mdx) como a los recursos de nube en Terraform."
+    },
+    {
+      "query_id": "A5",
+      "query_text": "¿Qué patrón se describe en la documentación del proyecto?",
+      "query_type": "ambigua",
+      "expected_domain": "ambigua",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-1", "url": "/docs/containers/multi-stage-builds", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/patterns/design-patterns", "relevance_grade": 1 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/microservices/communication", "relevance_grade": 1 }
+      ],
+      "notes": "'Patrón' nombra el patrón base/builder/runner en containers, los patrones GoF en patterns y el patrón de comunicación síncrona en microservices."
+    },
+    {
+      "query_id": "A6",
+      "query_text": "¿Qué significa que algo sea un singleton en este proyecto?",
+      "query_type": "ambigua",
+      "expected_domain": "ambigua",
+      "relevant_documents": [
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/patterns/design-patterns", "relevance_grade": 2 },
+        { "doc_folder": "thesis-doc-test-2", "url": "/docs/patterns/solid", "relevance_grade": 1 }
+      ],
+      "notes": "Singleton se define formalmente en design-patterns; solid.mdx lo menciona de paso al hablar de providers de NestJS."
+    },
+    {
+      "query_id": "N1",
+      "query_text": "¿Cómo se configura el balanceo de carga para el microservicio en producción?",
+      "query_type": "sin_evidencia",
+      "expected_domain": "sin_evidencia",
+      "relevant_documents": [],
+      "notes": "No hay documento en el corpus que describa configuración de load balancer."
+    },
+    {
+      "query_id": "N2",
+      "query_text": "¿Qué política de rate limiting aplica la API del microservicio?",
+      "query_type": "sin_evidencia",
+      "expected_domain": "sin_evidencia",
+      "relevant_documents": [],
+      "notes": "Rate limiting no está documentado en ningún archivo del corpus."
+    },
+    {
+      "query_id": "N3",
+      "query_text": "¿Cómo se realiza el rollback automático ante un despliegue fallido en Cloud Run?",
+      "query_type": "sin_evidencia",
+      "expected_domain": "sin_evidencia",
+      "relevant_documents": [],
+      "notes": "El corpus no documenta estrategias de rollback."
+    },
+    {
+      "query_id": "N4",
+      "query_text": "¿Qué proveedores de modelos de lenguaje alternativos a Gemini soporta actualmente el sistema?",
+      "query_type": "sin_evidencia",
+      "expected_domain": "sin_evidencia",
+      "relevant_documents": [],
+      "notes": "Ningún documento describe soporte multi-proveedor implementado; solo se evaluaron alternativas en el ADR, no soporte activo."
+    },
+    {
+      "query_id": "N5",
+      "query_text": "¿Qué política de retención de logs se aplica en Cloud Logging?",
+      "query_type": "sin_evidencia",
+      "expected_domain": "sin_evidencia",
+      "relevant_documents": [],
+      "notes": "logging.mdx no menciona políticas de retención."
+    },
+    {
+      "query_id": "N6",
+      "query_text": "¿Cómo se gestionan los secretos de base de datos en Kubernetes?",
+      "query_type": "sin_evidencia",
+      "expected_domain": "sin_evidencia",
+      "relevant_documents": [],
+      "notes": "El proyecto no usa Kubernetes; no hay documento relevante."
+    }
+  ]
+}

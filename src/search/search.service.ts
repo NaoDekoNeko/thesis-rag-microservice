@@ -18,6 +18,8 @@ interface SearchOptions {
   k?: number;
 }
 
+export type SearchMode = 'lexical' | 'vector' | 'hybrid';
+
 @Injectable()
 export class SearchService {
   private readonly logger = new Logger(SearchService.name);
@@ -48,6 +50,22 @@ export class SearchService {
 
     const results = this.combineAndRank(semantic, keyword, k);
     return { results, searchType: 'hybrid' };
+  }
+
+  async search(
+    query: string,
+    mode: SearchMode,
+    opts: SearchOptions = {},
+  ): Promise<{ results: SearchResult[]; searchType: string }> {
+    if (mode === 'hybrid') return this.hybridSearch(query, opts);
+
+    const k = opts.k ?? 8;
+    const filters = this.buildFilters(opts);
+    const results =
+      mode === 'lexical'
+        ? await this.keywordSearch(query, k, filters)
+        : await this.semanticSearch(query, k, filters);
+    return { results, searchType: mode };
   }
 
   private async semanticSearch(

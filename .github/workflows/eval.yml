@@ -1,0 +1,37 @@
+name: Evaluación IR
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    name: Recall/Precision/MRR/nDCG contra ground truth
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Ejecutar evaluación
+        env:
+          MICROSERVICE_URL: ${{ secrets.MICROSERVICE_URL }}
+        run: pnpm run eval
+
+      - name: Publicar reporte
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval/report.json
