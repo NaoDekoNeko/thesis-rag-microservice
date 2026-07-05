@@ -18,7 +18,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "eval": "ts-node --transpile-only eval/run-eval.ts"
+    "eval": "ts-node --transpile-only eval/run-eval.ts",
+    "eval:compare-baseline": "ts-node --transpile-only eval/compare-baseline.ts"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",
