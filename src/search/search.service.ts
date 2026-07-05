@@ -61,11 +61,24 @@ export class SearchService {
 
     const k = opts.k ?? 8;
     const filters = this.buildFilters(opts);
-    const results =
+    const rows =
       mode === 'lexical'
-        ? await this.keywordSearch(query, k, filters)
-        : await this.semanticSearch(query, k, filters);
-    return { results, searchType: mode };
+        ? await this.keywordSearch(query, k * 3, filters)
+        : await this.semanticSearch(query, k * 3, filters);
+    return { results: this.dedupeToDocs(rows, k), searchType: mode };
+  }
+
+  // El índice opera a nivel de chunk; la recuperación se reporta a nivel de
+  // documento (mismo criterio que la anotación del ground truth), quedándose
+  // con el chunk de mayor score por documento.
+  private dedupeToDocs(rows: SearchResult[], k: number): SearchResult[] {
+    const byDoc = new Map<string, SearchResult>();
+    for (const r of rows) {
+      const docKey = `${r.doc_folder}::${r.url}`;
+      const existing = byDoc.get(docKey);
+      if (!existing || r.score > existing.score) byDoc.set(docKey, r);
+    }
+    return [...byDoc.values()].sort((a, b) => b.score - a.score).slice(0, k);
   }
 
   private async semanticSearch(
@@ -161,17 +174,20 @@ export class SearchService {
     keyword: SearchResult[],
     k: number,
   ): SearchResult[] {
-    const map = new Map<string, SearchResult>();
+    const docKey = (r: SearchResult) => `${r.doc_folder}::${r.url}`;
+    const semanticDocs = this.dedupeToDocs(semantic, semantic.length);
+    const keywordDocs = this.dedupeToDocs(keyword, keyword.length);
 
-    for (const r of semantic) {
-      map.set(r.url, { ...r, score: r.score * 0.7 });
+    const map = new Map<string, SearchResult>();
+    for (const r of semanticDocs) {
+      map.set(docKey(r), { ...r, score: r.score * 0.7 });
     }
-    for (const r of keyword) {
-      const existing = map.get(r.url);
+    for (const r of keywordDocs) {
+      const existing = map.get(docKey(r));
       if (existing) {
         existing.score += r.score * 0.3;
       } else {
-        map.set(r.url, { ...r, score: r.score * 0.3 });
+        map.set(docKey(r), { ...r, score: r.score * 0.3 });
       }
     }
 
