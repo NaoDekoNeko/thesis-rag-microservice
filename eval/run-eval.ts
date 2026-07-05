@@ -91,8 +91,14 @@ async function search(
   return { hits: body.results, latencyMs: performance.now() - start };
 }
 
+// GT_FILE permite apuntar a un ground truth distinto (p. ej. el de la
+// implementación local, no publicable, para la batería IR de la Etapa 1)
+// sin alterar el uso por defecto contra el ground truth público de la Etapa 2.
 async function main() {
-  const gt = JSON.parse(readFileSync(join(__dirname, 'ground-truth.json'), 'utf-8'));
+  const gtPath = process.env.GT_FILE
+    ? process.env.GT_FILE
+    : join(__dirname, 'ground-truth.json');
+  const gt = JSON.parse(readFileSync(gtPath, 'utf-8'));
   const queries: Query[] = gt.queries;
 
   const perModeRows: Record<string, any[]> = Object.fromEntries(MODES.map((m) => [m, []]));
@@ -149,7 +155,10 @@ async function main() {
     }
   }
 
-  writeFileSync(join(__dirname, 'report.json'), JSON.stringify(report, null, 2));
+  const reportPath = process.env.REPORT_FILE
+    ? process.env.REPORT_FILE
+    : join(__dirname, 'report.json');
+  writeFileSync(reportPath, JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report.byMode, null, 2));
 }
 
