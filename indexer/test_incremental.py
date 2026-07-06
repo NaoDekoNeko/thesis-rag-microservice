@@ -2,11 +2,13 @@
 """Self-test de la logica de diff para indexacion incremental (sin DB ni red)."""
 import io
 import os
+import tempfile
 from contextlib import redirect_stdout
 
 for var in ("GEMINI_API_KEY", "DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"):
     os.environ.setdefault(var, "test")
 
+import document_processor as dp  # noqa: E402
 from document_processor import compute_content_hash, describe_plan, plan_sync  # noqa: E402
 
 
@@ -59,6 +61,27 @@ def test_describe_plan_prints_hashes_for_each_case():
     assert "NUEVO" in out
     assert compute_content_hash("vieja") in out
     assert compute_content_hash("nueva") in out
+
+
+def test_append_markdown_report_only_lists_affected_chunks():
+    existing = {0: compute_content_hash("a"), 1: compute_content_hash("vieja")}
+    new_chunks = ["a", "nueva", "extra"]
+    plan = plan_sync(existing, new_chunks)
+    with tempfile.NamedTemporaryFile(mode="r", suffix=".md", delete=False) as tmp:
+        path = tmp.name
+    original = dp.SYNC_REPORT_FILE
+    dp.SYNC_REPORT_FILE = path
+    try:
+        dp.append_markdown_report("archivo.md", existing, new_chunks, plan)
+    finally:
+        dp.SYNC_REPORT_FILE = original
+    content = open(path, encoding="utf-8").read()
+    os.remove(path)
+    rows = [line for line in content.splitlines() if line.startswith("| `archivo.md`")]
+    assert len(rows) == 2  # solo los 2 chunks afectados (indices 1 y 2), no el 0 (sin cambios)
+    assert any("modificado" in r for r in rows)
+    assert any("nuevo" in r for r in rows)
+    assert compute_content_hash("nueva")[:12] in content
 
 
 if __name__ == "__main__":

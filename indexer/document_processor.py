@@ -43,6 +43,7 @@ EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001
 TABLE = os.environ.get("VECTOR_TABLE_NAME", "doc_embeddings_rag")
 DOC_FOLDER = os.environ.get("DOC_FOLDER", "unknown")
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", 20))
+SYNC_REPORT_FILE = os.environ.get("SYNC_REPORT_FILE", "")
 EMBEDDING_DIM = 768
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -257,6 +258,23 @@ def describe_plan(source_file: str, existing: dict[int, str], new_chunks: list[s
         print(f"    [{source_file}#{i}] ELIMINADO   hash_anterior={existing.get(i)}")
 
 
+def append_markdown_report(source_file: str, existing: dict[int, str], new_chunks: list[str], plan: SyncPlan):
+    """Anexa a SYNC_REPORT_FILE solo los chunks afectados (evidencia compacta para PR)."""
+    if not SYNC_REPORT_FILE:
+        return
+    rows = []
+    for i in plan.to_upsert:
+        old_hash = existing.get(i)
+        new_hash = compute_content_hash(new_chunks[i])
+        estado = "🆕 nuevo" if old_hash is None else "✏️ modificado"
+        rows.append(f"| `{source_file}` | {i} | {estado} | `{(old_hash or '—')[:12]}` | `{new_hash[:12]}` |")
+    for i in plan.to_delete:
+        rows.append(f"| `{source_file}` | {i} | 🗑️ eliminado | `{(existing.get(i) or '—')[:12]}` | — |")
+    if rows:
+        with open(SYNC_REPORT_FILE, "a", encoding="utf-8") as f:
+            f.write("\n".join(rows) + "\n")
+
+
 def sync_docs(conn, files: list[dict], client: genai.Client, doc_folder: str, force_clear: bool):
     if force_clear:
         with conn.cursor() as cur:
@@ -274,6 +292,7 @@ def sync_docs(conn, files: list[dict], client: genai.Client, doc_folder: str, fo
         existing = {} if force_clear else get_existing_chunks(conn, doc_folder, f["source_file"])
         plan = plan_sync(existing, f["chunks"])
         describe_plan(f["source_file"], existing, f["chunks"], plan)
+        append_markdown_report(f["source_file"], existing, f["chunks"], plan)
         delete_chunks(conn, doc_folder, f["source_file"], plan.to_delete)
         total_chunks += len(f["chunks"])
         for i in plan.to_upsert:
@@ -322,6 +341,10 @@ def main():
         raise SystemExit(f"Ruta no existe: {docs_path}")
 
     force_clear = os.environ.get("CLEAR", "false").lower() == "true"
+
+    if SYNC_REPORT_FILE:
+        with open(SYNC_REPORT_FILE, "w", encoding="utf-8") as f:
+            f.write("| Archivo | Chunk | Estado | Hash anterior | Hash actual |\n|---|---|---|---|---|\n")
 
     print(f"Conectando a {DB_HOST}:{DB_PORT}/{DB_NAME}...")
     activate_schema()
