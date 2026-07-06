@@ -241,6 +241,22 @@ def delete_chunks(conn, doc_folder: str, source_file: str, indices: list[int]):
     conn.commit()
 
 
+def describe_plan(source_file: str, existing: dict[int, str], new_chunks: list[str], plan: SyncPlan):
+    """Traza legible del diff: hash anterior vs. actual por chunk (evidencia de auditoria)."""
+    for i, chunk in enumerate(new_chunks):
+        old_hash = existing.get(i)
+        new_hash = compute_content_hash(chunk)
+        if i not in plan.to_upsert:
+            estado = "sin cambios"
+        elif old_hash is None:
+            estado = "NUEVO"
+        else:
+            estado = "MODIFICADO"
+        print(f"    [{source_file}#{i}] {estado:<11} hash_anterior={old_hash} hash_actual={new_hash}")
+    for i in plan.to_delete:
+        print(f"    [{source_file}#{i}] ELIMINADO   hash_anterior={existing.get(i)}")
+
+
 def sync_docs(conn, files: list[dict], client: genai.Client, doc_folder: str, force_clear: bool):
     if force_clear:
         with conn.cursor() as cur:
@@ -257,6 +273,7 @@ def sync_docs(conn, files: list[dict], client: genai.Client, doc_folder: str, fo
     for f in files:
         existing = {} if force_clear else get_existing_chunks(conn, doc_folder, f["source_file"])
         plan = plan_sync(existing, f["chunks"])
+        describe_plan(f["source_file"], existing, f["chunks"], plan)
         delete_chunks(conn, doc_folder, f["source_file"], plan.to_delete)
         total_chunks += len(f["chunks"])
         for i in plan.to_upsert:

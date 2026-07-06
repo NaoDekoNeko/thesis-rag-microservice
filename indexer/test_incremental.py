@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Self-test de la logica de diff para indexacion incremental (sin DB ni red)."""
+import io
 import os
+from contextlib import redirect_stdout
 
 for var in ("GEMINI_API_KEY", "DB_HOST", "DB_NAME", "DB_USER", "DB_PASSWORD"):
     os.environ.setdefault(var, "test")
 
-from document_processor import compute_content_hash, plan_sync  # noqa: E402
+from document_processor import compute_content_hash, describe_plan, plan_sync  # noqa: E402
 
 
 def test_unchanged_chunk_skipped():
@@ -42,6 +44,21 @@ def test_empty_existing_all_new():
 def test_hash_is_deterministic_and_content_sensitive():
     assert compute_content_hash("abc") == compute_content_hash("abc")
     assert compute_content_hash("abc") != compute_content_hash("abd")
+
+
+def test_describe_plan_prints_hashes_for_each_case():
+    existing = {0: compute_content_hash("a"), 1: compute_content_hash("vieja")}
+    new_chunks = ["a", "nueva", "extra"]
+    plan = plan_sync(existing, new_chunks)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        describe_plan("archivo.md", existing, new_chunks, plan)
+    out = buf.getvalue()
+    assert "sin cambios" in out
+    assert "MODIFICADO" in out
+    assert "NUEVO" in out
+    assert compute_content_hash("vieja") in out
+    assert compute_content_hash("nueva") in out
 
 
 if __name__ == "__main__":
