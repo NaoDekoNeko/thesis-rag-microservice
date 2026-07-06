@@ -10,10 +10,18 @@ Variables opcionales:
   GEMINI_EMBEDDING_MODEL (default gemini-embedding-001),
   VECTOR_TABLE_NAME (default doc_embeddings_rag),
   DOC_FOLDER (default "unknown"), BATCH_SIZE (default 20)
+
+Indexacion incremental: la identidad estable de una unidad reprocesable es
+(doc_folder, source_file, chunk_index). Cada chunk se compara por hash MD5
+de su contenido contra el valor persistido; solo los chunks nuevos o
+modificados se reembeben, los chunks sobrantes (archivo mas corto) se
+borran, y los archivos que desaparecen del corpus se borran por completo.
 """
+import hashlib
 import os
 import re
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import psycopg2
@@ -39,6 +47,30 @@ EMBEDDING_DIM = 768
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+@dataclass
+class SyncPlan:
+    to_upsert: list[int]
+    to_delete: list[int]
+
+
+def compute_content_hash(text: str) -> str:
+    return hashlib.md5(text.encode("utf-8")).hexdigest()
+
+
+def plan_sync(existing: dict[int, str], new_chunks: list[str]) -> SyncPlan:
+    """Diff puro entre el estado persistido y el contenido actual de un archivo.
+
+    existing: {chunk_index: content_hash} tal como esta en el indice.
+    new_chunks: contenido actual de cada chunk, en orden.
+    """
+    to_upsert = [
+        i for i, chunk in enumerate(new_chunks)
+        if existing.get(i) != compute_content_hash(chunk)
+    ]
+    to_delete = [i for i in existing if i >= len(new_chunks)]
+    return SyncPlan(to_upsert=to_upsert, to_delete=to_delete)
+
+
 def activate_schema():
     if not MICROSERVICE_URL:
         print("MICROSERVICE_URL no configurado — omitiendo setup-db")
@@ -55,7 +87,6 @@ def activate_schema():
 
 def setup_db(conn):
     with conn.cursor() as cur:
-        pass  # schema ya activado via microservicio
         cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {TABLE} (
                 id          SERIAL PRIMARY KEY,
@@ -64,11 +95,20 @@ def setup_db(conn):
                 url         TEXT,
                 category    TEXT,
                 content     TEXT NOT NULL,
+                source_file TEXT,
+                chunk_index INTEGER,
+                content_hash TEXT,
                 embedding   vector({EMBEDDING_DIM}),
                 fts_vector  tsvector GENERATED ALWAYS AS (
                                 to_tsvector('spanish', content)
                             ) STORED
             );
+        """)
+        cur.execute(f"""
+            ALTER TABLE {TABLE}
+                ADD COLUMN IF NOT EXISTS source_file TEXT,
+                ADD COLUMN IF NOT EXISTS chunk_index INTEGER,
+                ADD COLUMN IF NOT EXISTS content_hash TEXT;
         """)
         cur.execute(f"""
             CREATE INDEX IF NOT EXISTS {TABLE}_embedding_idx
@@ -77,6 +117,10 @@ def setup_db(conn):
         cur.execute(f"""
             CREATE INDEX IF NOT EXISTS {TABLE}_fts_idx
                 ON {TABLE} USING gin (fts_vector);
+        """)
+        cur.execute(f"""
+            CREATE UNIQUE INDEX IF NOT EXISTS {TABLE}_chunk_identity_idx
+                ON {TABLE} (doc_folder, source_file, chunk_index);
         """)
     conn.commit()
 
@@ -115,22 +159,23 @@ def chunk_text(text: str) -> list[str]:
 
 
 def collect_docs(docs_path: Path) -> list[dict]:
-    docs = []
+    """Agrupa por archivo (no por chunk) para poder diffear con lo indexado."""
+    files = []
     for md_file in sorted(docs_path.rglob("*.md")) + sorted(docs_path.rglob("*.mdx")):
         text = md_file.read_text(encoding="utf-8")
         meta = extract_frontmatter(text)
         clean = strip_markdown(text)
         rel = md_file.relative_to(docs_path.parent)
         url = "/" + str(rel).replace("\\", "/").removesuffix(".md").removesuffix(".mdx")
-        for chunk in chunk_text(clean):
-            docs.append({
-                "doc_folder": DOC_FOLDER,
-                "title": meta.get("title") or md_file.stem,
-                "url": url,
-                "category": meta.get("category", ""),
-                "content": chunk,
-            })
-    return docs
+        files.append({
+            "source_file": str(rel),
+            "doc_folder": DOC_FOLDER,
+            "title": meta.get("title") or md_file.stem,
+            "url": url,
+            "category": meta.get("category", ""),
+            "chunks": chunk_text(clean),
+        })
+    return files
 
 
 def embed_batch(client: genai.Client, texts: list[str]) -> list[list[float]]:
@@ -155,33 +200,102 @@ def embed_batch(client: genai.Client, texts: list[str]) -> list[list[float]]:
             time.sleep(2 ** attempt)
 
 
-def index_docs(conn, docs: list[dict], client: genai.Client):
-    total = len(docs)
-    inserted = 0
-    for i in range(0, total, BATCH_SIZE):
-        batch = docs[i: i + BATCH_SIZE]
-        texts = [d["content"] for d in batch]
-        embeddings = embed_batch(client, texts)
+def get_existing_chunks(conn, doc_folder: str, source_file: str) -> dict[int, str]:
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT chunk_index, content_hash FROM {TABLE} "
+            "WHERE doc_folder = %s AND source_file = %s",
+            (doc_folder, source_file),
+        )
+        return {row[0]: row[1] for row in cur.fetchall()}
 
+
+def get_indexed_source_files(conn, doc_folder: str) -> set[str]:
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT DISTINCT source_file FROM {TABLE} "
+            "WHERE doc_folder = %s AND source_file IS NOT NULL",
+            (doc_folder,),
+        )
+        return {row[0] for row in cur.fetchall()}
+
+
+def delete_source_file(conn, doc_folder: str, source_file: str):
+    with conn.cursor() as cur:
+        cur.execute(
+            f"DELETE FROM {TABLE} WHERE doc_folder = %s AND source_file = %s",
+            (doc_folder, source_file),
+        )
+    conn.commit()
+
+
+def delete_chunks(conn, doc_folder: str, source_file: str, indices: list[int]):
+    if not indices:
+        return
+    with conn.cursor() as cur:
+        cur.execute(
+            f"DELETE FROM {TABLE} WHERE doc_folder = %s AND source_file = %s "
+            "AND chunk_index = ANY(%s)",
+            (doc_folder, source_file, indices),
+        )
+    conn.commit()
+
+
+def sync_docs(conn, files: list[dict], client: genai.Client, doc_folder: str, force_clear: bool):
+    if force_clear:
         with conn.cursor() as cur:
-            for doc, emb in zip(batch, embeddings):
+            cur.execute(f"DELETE FROM {TABLE} WHERE doc_folder = %s", (doc_folder,))
+        conn.commit()
+
+    current_files = {f["source_file"] for f in files}
+    for stale in get_indexed_source_files(conn, doc_folder) - current_files:
+        delete_source_file(conn, doc_folder, stale)
+        print(f"  Eliminado del indice (archivo ya no existe): {stale}")
+
+    pending: list[tuple[dict, int, str]] = []
+    total_chunks = 0
+    for f in files:
+        existing = {} if force_clear else get_existing_chunks(conn, doc_folder, f["source_file"])
+        plan = plan_sync(existing, f["chunks"])
+        delete_chunks(conn, doc_folder, f["source_file"], plan.to_delete)
+        total_chunks += len(f["chunks"])
+        for i in plan.to_upsert:
+            pending.append((f, i, f["chunks"][i]))
+
+    print(f"  {total_chunks} chunks totales, {len(pending)} a reprocesar")
+
+    for i in range(0, len(pending), BATCH_SIZE):
+        batch = pending[i:i + BATCH_SIZE]
+        embeddings = embed_batch(client, [c[2] for c in batch])
+        with conn.cursor() as cur:
+            for (f, chunk_index, content), emb in zip(batch, embeddings):
                 cur.execute(
                     f"""
-                    INSERT INTO {TABLE} (doc_folder, title, url, category, content, embedding)
-                    VALUES (%s, %s, %s, %s, %s, %s::vector)
+                    INSERT INTO {TABLE}
+                        (doc_folder, source_file, chunk_index, title, url, category, content, content_hash, embedding)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
+                    ON CONFLICT (doc_folder, source_file, chunk_index) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        url = EXCLUDED.url,
+                        category = EXCLUDED.category,
+                        content = EXCLUDED.content,
+                        content_hash = EXCLUDED.content_hash,
+                        embedding = EXCLUDED.embedding
                     """,
                     (
-                        doc["doc_folder"],
-                        doc["title"],
-                        doc["url"],
-                        doc["category"],
-                        doc["content"],
+                        doc_folder,
+                        f["source_file"],
+                        chunk_index,
+                        f["title"],
+                        f["url"],
+                        f["category"],
+                        content,
+                        compute_content_hash(content),
                         f"[{','.join(str(v) for v in emb)}]",
                     ),
                 )
         conn.commit()
-        inserted += len(batch)
-        print(f"  [{inserted}/{total}] chunks indexados")
+        print(f"  [{min(i + BATCH_SIZE, len(pending))}/{len(pending)}] chunks reprocesados")
         time.sleep(0.5)  # rate-limit conservador
 
 
@@ -190,7 +304,7 @@ def main():
     if not docs_path.exists():
         raise SystemExit(f"Ruta no existe: {docs_path}")
 
-    clear = os.environ.get("CLEAR", "false").lower() == "true"
+    force_clear = os.environ.get("CLEAR", "false").lower() == "true"
 
     print(f"Conectando a {DB_HOST}:{DB_PORT}/{DB_NAME}...")
     activate_schema()
@@ -200,18 +314,13 @@ def main():
     )
     setup_db(conn)
 
-    if clear:
-        with conn.cursor() as cur:
-            cur.execute(f"DELETE FROM {TABLE} WHERE doc_folder = %s", (DOC_FOLDER,))
-        conn.commit()
-        print(f"Registros de '{DOC_FOLDER}' eliminados.")
-
     print(f"Recolectando documentos de {docs_path}...")
-    docs = collect_docs(docs_path)
-    print(f"  {len(docs)} chunks a indexar")
+    files = collect_docs(docs_path)
+    total = sum(len(f["chunks"]) for f in files)
+    print(f"  {len(files)} archivos, {total} chunks totales")
 
     client = genai.Client(api_key=GEMINI_API_KEY)
-    index_docs(conn, docs, client)
+    sync_docs(conn, files, client, DOC_FOLDER, force_clear=force_clear)
     conn.close()
     print("Indexación completada.")
 

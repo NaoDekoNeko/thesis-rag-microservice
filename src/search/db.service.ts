@@ -46,17 +46,26 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.pool.query(`
         CREATE TABLE IF NOT EXISTS ${TABLE} (
-          id         SERIAL PRIMARY KEY,
-          doc_folder TEXT NOT NULL,
-          title      TEXT,
-          url        TEXT,
-          category   TEXT,
-          content    TEXT NOT NULL,
-          embedding  vector(768),
-          fts_vector tsvector GENERATED ALWAYS AS (
-                         to_tsvector('spanish', content)
-                     ) STORED
+          id           SERIAL PRIMARY KEY,
+          doc_folder   TEXT NOT NULL,
+          title        TEXT,
+          url          TEXT,
+          category     TEXT,
+          content      TEXT NOT NULL,
+          source_file  TEXT,
+          chunk_index  INTEGER,
+          content_hash TEXT,
+          embedding    vector(768),
+          fts_vector   tsvector GENERATED ALWAYS AS (
+                           to_tsvector('spanish', content)
+                       ) STORED
         );
+      `);
+      await this.pool.query(`
+        ALTER TABLE ${TABLE}
+          ADD COLUMN IF NOT EXISTS source_file TEXT,
+          ADD COLUMN IF NOT EXISTS chunk_index INTEGER,
+          ADD COLUMN IF NOT EXISTS content_hash TEXT;
       `);
       await this.pool.query(`
         CREATE INDEX IF NOT EXISTS ${TABLE}_embedding_idx
@@ -65,6 +74,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query(`
         CREATE INDEX IF NOT EXISTS ${TABLE}_fts_idx
           ON ${TABLE} USING gin (fts_vector);
+      `);
+      await this.pool.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ${TABLE}_chunk_identity_idx
+          ON ${TABLE} (doc_folder, source_file, chunk_index);
       `);
       this.logger.log('DB schema ready');
     } catch (err) {
