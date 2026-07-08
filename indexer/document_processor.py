@@ -282,7 +282,11 @@ def sync_docs(conn, files: list[dict], client: genai.Client, doc_folder: str, fo
         conn.commit()
 
     current_files = {f["source_file"] for f in files}
-    for stale in get_indexed_source_files(conn, doc_folder) - current_files:
+    for stale in sorted(get_indexed_source_files(conn, doc_folder) - current_files):
+        existing = get_existing_chunks(conn, doc_folder, stale)
+        plan = plan_sync(existing, [])
+        describe_plan(stale, existing, [], plan)
+        append_markdown_report(stale, existing, [], plan)
         delete_source_file(conn, doc_folder, stale)
         print(f"  Eliminado del indice (archivo ya no existe): {stale}")
 
